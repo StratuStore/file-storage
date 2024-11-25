@@ -15,6 +15,7 @@ type Controller struct {
 	MaxSize     int
 	CurrentSize atomic.Int64
 	Files       map[uuid.UUID]*fileio.File
+	path        string
 	mx          *sync.RWMutex
 }
 
@@ -23,6 +24,7 @@ func NewController(filePath string, maxSize int) (*Controller, error) {
 		MaxSize:     maxSize,
 		CurrentSize: atomic.Int64{},
 		Files:       nil,
+		path:        filePath,
 		mx:          &sync.RWMutex{},
 	}
 
@@ -64,12 +66,52 @@ func (c *Controller) AllocateAll() (n int, err error) {
 	return 0, ErrMaxSizeExceeded
 }
 
-// Don't forget to sync map with mutex!!!
-func AddFile(id uuid.UUID) (*fileio.File, error)
+func (c *Controller) AddFile(id uuid.UUID) (*fileio.File, error) {
+	file, err := fileio.NewFile(c.path, id, c)
+	if err != nil {
+		return nil, err
+	}
 
-func DeleteFile(id uuid.UUID) error
+	c.mx.Lock()
+	defer c.mx.RUnlock()
+	if _, ok := c.Files[id]; ok {
+		return nil, os.ErrExist
+	}
 
-func File(id uuid.UUID) (*fileio.File, error)
+	c.Files[id] = file
+
+	return file, nil
+}
+
+func (c *Controller) DeleteFile(id uuid.UUID) error {
+	c.mx.Lock()
+
+	file, ok := c.Files[id]
+	if !ok {
+		return os.ErrNotExist
+	}
+
+	delete(c.Files, id)
+
+	c.mx.Unlock()
+
+	if err := file.Delete(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Controller) File(id uuid.UUID) (*fileio.File, error) {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+
+	if file, ok := c.Files[id]; ok {
+		return file, nil
+	}
+
+	return nil, os.ErrNotExist
+}
 
 func parseStorage(filePath string, controller *Controller) (files map[uuid.UUID]*fileio.File, currentSize int, err error) {
 	dir, err := os.ReadDir(filePath)

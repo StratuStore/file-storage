@@ -112,6 +112,18 @@ func (f *File) Close() error {
 	return nil
 }
 
+func (f *File) Delete() error {
+	f.Close()
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	return deleteFile(f.Path, f.ID.String())
+}
+
+func deleteFile(filePath string, name string) error {
+	return os.Remove(path.Join(filePath, name))
+}
+
 func createOrOpenFile(filename string) (*os.File, error) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0o666)
 
