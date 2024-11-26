@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"errors"
 	"github.com/StratuStore/file-storage/internal/libs/syncmap"
 	"github.com/google/uuid"
 	"io"
@@ -47,7 +48,26 @@ func (c *Connector[V]) Connection(id uuid.UUID) (V, error) {
 	return value, err
 }
 
-func StartDisposalRoutine(d time.Duration)
+func (c *Connector[V]) StartDisposalRoutine(sleep time.Duration, timeout time.Duration) {
+	go func() {
+		for {
+			time.Sleep(sleep)
+			c.dispose(timeout)
+		}
+	}()
+}
+
+func (c *Connector[V]) dispose(timeout time.Duration) (err error) {
+	for id, connection := range c.m.All() {
+		if connection.ActivityTime.Add(timeout).Before(time.Now()) {
+			connection.Value.Close()
+
+			err = errors.Join(err, c.m.Delete(id))
+		}
+	}
+
+	return err
+}
 
 type Connection[V any] struct {
 	ID           uuid.UUID
