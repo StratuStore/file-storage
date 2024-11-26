@@ -10,7 +10,8 @@ type UseCases struct {
 	FilesConnector    Connector[*fileio.File]
 	ReadersConnector  Connector[Reader]
 	StorageController StorageController
-	BufferSize        int
+	MaxBufferSize     int
+	MinBufferSize     int
 }
 
 type Connector[V io.Closer] interface {
