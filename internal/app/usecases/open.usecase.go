@@ -12,7 +12,7 @@ func (u *UseCases) OpenFile(ctx context.Context, fileID uuid.UUID) (connectionID
 		return connectionID, err
 	}
 
-	reader, err := file.Reader()
+	reader, err := file.Reader(u.BufferSize)
 	if err != nil {
 		return connectionID, err
 	}

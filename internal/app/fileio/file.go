@@ -51,14 +51,14 @@ func (f *File) Sync(controller StorageController) error {
 	return nil
 }
 
-func (f *File) Reader() (Reader, error) {
+func (f *File) Reader(bufferSize int) (Reader, error) {
 	if f.closed {
 		return nil, os.ErrClosed
 	}
 	f.mx.RLock()
 	defer f.mx.RUnlock()
 
-	reader, err := NewFileReader(f)
+	reader, err := NewFileReader(f, bufferSize)
 	if err != nil {
 		return nil, err
 	}

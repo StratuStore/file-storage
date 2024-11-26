@@ -14,13 +14,13 @@ type FileReader struct {
 	mx     *sync.Mutex
 }
 
-func NewFileReader(f *File) (*FileReader, error) {
+func NewFileReader(f *File, size int) (*FileReader, error) {
 	osFile, err := os.Open(path.Join(f.Path, f.ID.String()))
 	if err != nil {
 		return nil, err
 	}
 
-	buffer := bufio.NewReader(osFile)
+	buffer := bufio.NewReaderSize(osFile, size)
 
 	return &FileReader{
 		file:   f,
