@@ -10,5 +10,4 @@ type Writer interface {
 
 type Reader interface {
 	io.ReadSeekCloser
-	io.ReaderAt
 }

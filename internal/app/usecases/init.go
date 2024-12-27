@@ -28,7 +28,6 @@ type File interface {
 
 type Reader interface {
 	io.ReadSeekCloser
-	io.ReaderAt
 }
 
 type StorageController interface {

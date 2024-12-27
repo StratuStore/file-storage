@@ -11,7 +11,8 @@ type FileReader struct {
 	file   *File
 	osFile *os.File
 	buffer *bufio.Reader
-	mx     *sync.Mutex
+	mx     sync.Mutex
+	pos    int64
 }
 
 func NewFileReader(f *File, size int) (*FileReader, error) {
@@ -26,11 +27,11 @@ func NewFileReader(f *File, size int) (*FileReader, error) {
 		file:   f,
 		osFile: osFile,
 		buffer: buffer,
-		mx:     &sync.Mutex{},
+		mx:     sync.Mutex{},
 	}, nil
 }
 
-func (r *FileReader) Seek(offset int64, whence int) (int64, error) {
+func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
 	if r.file.closed {
 		return 0, os.ErrClosed
 	}
@@ -40,36 +41,27 @@ func (r *FileReader) Seek(offset int64, whence int) (int64, error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	ret, err := r.osFile.Seek(offset, whence)
+	oldGlobOffset := r.pos
+	r.pos, err = r.osFile.Seek(offset, whence)
+	if err != nil {
+		return r.pos, err
+	}
+
+	if off := r.pos - oldGlobOffset; off >= 0 {
+		_, err := r.buffer.Discard(int(off))
+
+		return r.pos, err
+	}
 	r.buffer.Reset(r.osFile)
 
-	return ret, err
+	return r.pos, nil
 }
 
 func (r *FileReader) Close() error {
 	return r.osFile.Close()
 }
 
-func (r *FileReader) ReadAt(buffer []byte, off int64) (n int, err error) {
-	if r.file.closed {
-		return 0, os.ErrClosed
-	}
-
-	r.file.mx.RLock()
-	defer r.file.mx.RUnlock()
-
-	_, err = r.Seek(off, 0)
-	r.mx.Lock()
-	defer r.mx.Unlock()
-
-	if err != nil {
-		return 0, err
-	}
-
-	return r.buffer.Read(buffer)
-}
-
-func (r *FileReader) Read(buffer []byte) (n int, err error) {
+func (r *FileReader) Read(p []byte) (n int, err error) {
 	if r.file.closed {
 		return 0, os.ErrClosed
 	}
@@ -79,5 +71,9 @@ func (r *FileReader) Read(buffer []byte) (n int, err error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	return r.buffer.Read(buffer)
+	n, err = r.buffer.Read(p)
+
+	r.pos, _ = r.osFile.Seek(0, 1)
+
+	return n, err
 }
