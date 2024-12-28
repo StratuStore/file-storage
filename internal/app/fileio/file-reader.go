@@ -2,6 +2,7 @@ package fileio
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -18,7 +19,6 @@ type FileReader struct {
 	osFile *os.File
 	buffer *bufio.Reader
 	mx     sync.Mutex
-	pos    int64
 	v      int
 	closed bool
 }
@@ -54,20 +54,25 @@ func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	oldGlobOffset := r.pos
-	r.pos, err = r.osFile.Seek(offset, whence)
+	oldPosition, err := r.position()
 	if err != nil {
-		return r.pos, err
+		return oldPosition, err
 	}
 
-	if off := r.pos - oldGlobOffset; off >= 0 {
-		_, err := r.buffer.Discard(int(off))
+	newOffset, err := r.osFile.Seek(offset, whence)
+	if err != nil {
+		return newOffset, err
+	}
 
-		return r.pos, err
+	if diff := newOffset - int64(r.buffer.Buffered()) - oldPosition; diff >= 0 {
+		_, err = r.buffer.Discard(int(diff))
+		off, err2 := r.osFile.Seek(int64(r.buffer.Buffered()), 1)
+
+		return off - int64(r.buffer.Buffered()), errors.Join(err, err2)
 	}
 	r.buffer.Reset(r.osFile)
 
-	return r.pos, nil
+	return newOffset, nil
 }
 
 func (r *FileReader) Closed() bool {
@@ -78,6 +83,7 @@ func (r *FileReader) Close() error {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 	r.closed = true
+	r.buffer = nil
 
 	return r.osFile.Close()
 }
@@ -98,7 +104,14 @@ func (r *FileReader) Read(p []byte) (n int, err error) {
 
 	n, err = r.buffer.Read(p)
 
-	r.pos, _ = r.osFile.Seek(0, 1)
-
 	return n, err
+}
+
+// mutexes must be triggered before using this func
+func (r *FileReader) position() (int64, error) {
+	ret, err := r.osFile.Seek(0, 1)
+
+	buffSize := r.buffer.Buffered()
+
+	return ret - int64(buffSize), err
 }
