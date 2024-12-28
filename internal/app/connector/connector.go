@@ -9,12 +9,17 @@ import (
 	"time"
 )
 
-// Connector saves an opened disposable objects. V should be a pointer or an interface
-type Connector[V io.Closer] struct {
+type Closer interface {
+	Closed() bool
+	io.Closer
+}
+
+// Connector saves an opened disposable objects.
+type Connector[V Closer] struct {
 	m syncmap.Map[uuid.UUID, Connection[V]]
 }
 
-func NewConnector[V io.Closer]() *Connector[V] {
+func NewConnector[V Closer]() *Connector[V] {
 	return &Connector[V]{m: syncmap.NewMap[uuid.UUID, Connection[V]]()}
 }
 
@@ -59,7 +64,7 @@ func (c *Connector[V]) StartDisposalRoutine(sleep time.Duration, timeout time.Du
 
 func (c *Connector[V]) dispose(timeout time.Duration) (err error) {
 	for id, connection := range c.m.All() {
-		if connection.ActivityTime.Add(timeout).Before(time.Now()) {
+		if connection.ActivityTime.Add(timeout).Before(time.Now()) || connection.Value.Closed() {
 			connection.Value.Close()
 
 			err = errors.Join(err, c.m.Delete(id))

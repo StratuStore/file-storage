@@ -2,10 +2,16 @@ package fileio
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path"
 	"sync"
 )
+
+type Reader interface {
+	io.ReadSeekCloser
+	Closed() bool
+}
 
 type FileReader struct {
 	file   *File
@@ -13,26 +19,33 @@ type FileReader struct {
 	buffer *bufio.Reader
 	mx     sync.Mutex
 	pos    int64
+	v      int
+	closed bool
 }
 
-func NewFileReader(f *File, size int) (*FileReader, error) {
+func NewFileReader(f *File, bufferSize, v int) (*FileReader, error) {
 	osFile, err := os.Open(path.Join(f.Path, f.ID.String()))
 	if err != nil {
 		return nil, err
 	}
 
-	buffer := bufio.NewReaderSize(osFile, size)
+	buffer := bufio.NewReaderSize(osFile, bufferSize)
 
 	return &FileReader{
 		file:   f,
 		osFile: osFile,
 		buffer: buffer,
 		mx:     sync.Mutex{},
+		v:      v, // version of the file
 	}, nil
 }
 
 func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
-	if r.file.closed {
+	if r.file.closed || r.closed {
+		return 0, os.ErrClosed
+	}
+	if r.file.v != r.v {
+		r.Close()
 		return 0, os.ErrClosed
 	}
 
@@ -57,12 +70,24 @@ func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
 	return r.pos, nil
 }
 
+func (r *FileReader) Closed() bool {
+	return r.closed || r.file.closed
+}
+
 func (r *FileReader) Close() error {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+	r.closed = true
+
 	return r.osFile.Close()
 }
 
 func (r *FileReader) Read(p []byte) (n int, err error) {
-	if r.file.closed {
+	if r.file.closed || r.closed {
+		return 0, os.ErrClosed
+	}
+	if r.file.v != r.v {
+		r.Close()
 		return 0, os.ErrClosed
 	}
 

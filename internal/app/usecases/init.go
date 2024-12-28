@@ -14,9 +14,14 @@ type UseCases struct {
 	MinBufferSize     int
 }
 
-type Connector[V io.Closer] interface {
+type Connector[V Closer] interface {
 	OpenConnection(value V) (uuid.UUID, error)
 	Connection(id uuid.UUID) (V, error)
+}
+
+type Closer interface {
+	Closed() bool
+	io.Closer
 }
 
 type File interface {
@@ -28,6 +33,7 @@ type File interface {
 
 type Reader interface {
 	io.ReadSeekCloser
+	Closer
 }
 
 type StorageController interface {
