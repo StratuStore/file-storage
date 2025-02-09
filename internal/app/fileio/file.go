@@ -8,46 +8,70 @@ import (
 	"sync"
 )
 
-type File struct {
-	ID         uuid.UUID
-	Path       string
-	Size       int
+type File interface {
+	Sync(controller StorageController) error
+	Reader(bufferSize int) (Reader, error)
+	Writer() (io.WriteCloser, error)
+	Close() error
+	Delete() error
+
+	ID() uuid.UUID
+	FullPath() string
+	Size() int
+	Closed() bool
+	version() int
+	rwMx() *sync.RWMutex
+
+	allocate(size int) error
+	readOpen() (FsFile, error)
+	writeOpen() (FsFile, error)
+}
+
+type file struct {
+	id         uuid.UUID
+	path       string
+	size       int
 	controller StorageController
 	mx         *sync.RWMutex
 	closed     bool
 	v          int
 }
 
-func NewFile(filePath string, id uuid.UUID, controller StorageController) (*File, error) {
-	file, err := createOrOpenFile(path.Join(filePath, id.String()))
+func NewFile(filePath string, id uuid.UUID, controller StorageController) (File, error) {
+	f, err := controller.CreateOrWriteOpen(path.Join(filePath, id.String()))
 	if err != nil {
 		return nil, err
 	}
-	stat, err := file.Stat()
+	stat, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 	size := stat.Size()
-	file.Close()
+	f.Close()
 
-	return &File{
-		ID:         id,
-		Path:       filePath,
-		Size:       int(size),
+	return &file{
+		id:         id,
+		path:       filePath,
+		size:       int(size),
 		controller: controller,
 		mx:         &sync.RWMutex{},
 	}, nil
 }
 
-// Sync is used when File has been imported from DB and has missing unexported fields
-func (f *File) Sync(controller StorageController) error {
+// Sync is used when file has been imported from DB and has some missing unexported fields
+func (f *file) Sync(controller StorageController) error {
 	if f.closed {
 		return os.ErrClosed
 	}
-	file, err := createOrOpenFile(path.Join(f.Path, f.ID.String()))
+	file, err := controller.CreateOrWriteOpen(f.FullPath())
 	if err != nil {
 		return err
 	}
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	f.size = int(stat.Size())
 	file.Close()
 
 	f.controller = controller
@@ -56,14 +80,14 @@ func (f *File) Sync(controller StorageController) error {
 	return nil
 }
 
-func (f *File) Reader(bufferSize int) (Reader, error) {
+func (f *file) Reader(bufferSize int) (Reader, error) {
 	if f.closed {
 		return nil, os.ErrClosed
 	}
 	f.mx.RLock()
 	defer f.mx.RUnlock()
 
-	reader, err := NewFileReader(f, bufferSize, f.v)
+	reader, err := newFileReader(f, bufferSize, f.v)
 	if err != nil {
 		return nil, err
 	}
@@ -71,27 +95,32 @@ func (f *File) Reader(bufferSize int) (Reader, error) {
 	return reader, nil
 }
 
-func (f *File) Writer() (io.WriteCloser, error) {
+func (f *file) Writer() (io.WriteCloser, error) {
 	if f.closed {
 		return nil, os.ErrClosed
 	}
 	f.mx.Lock()
 
 	f.v++
-	writer, err := NewFileWriter(f)
+
+	size := f.size
+	err := f.controller.ReleaseStorage(f.size)
 	if err != nil {
-		f.mx.Unlock()
+		return nil, err
+	}
+	f.size = 0
+
+	writer, err := newFileWriter(f)
+	if err != nil {
 		f.v--
+		f.size = size
+		f.mx.Unlock()
 	}
 
 	return writer, err
 }
 
-func (f *File) Closed() bool {
-	return f.closed
-}
-
-func (f *File) Close() error {
+func (f *file) Close() error {
 	if f.closed {
 		return os.ErrClosed
 	}
@@ -102,7 +131,7 @@ func (f *File) Close() error {
 	return nil
 }
 
-func (f *File) Delete() error {
+func (f *file) Delete() error {
 	if f.closed {
 		return os.ErrClosed
 	}
@@ -110,15 +139,40 @@ func (f *File) Delete() error {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	return deleteFile(f.Path, f.ID.String())
+	return f.controller.FSDelete(f.FullPath())
 }
 
-func deleteFile(filePath string, name string) error {
-	return os.Remove(path.Join(filePath, name))
+func (f *file) Closed() bool {
+	return f.closed
 }
 
-func createOrOpenFile(filename string) (*os.File, error) {
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o666)
+func (f *file) FullPath() string {
+	return path.Join(f.path, f.id.String())
+}
 
-	return file, err
+func (f *file) ID() uuid.UUID {
+	return f.id
+}
+func (f *file) Size() int {
+	return f.size
+}
+
+func (f *file) allocate(size int) error {
+	return f.controller.AllocateStorage(size)
+}
+
+func (f *file) rwMx() *sync.RWMutex {
+	return f.mx
+}
+
+func (f *file) readOpen() (FsFile, error) {
+	return f.controller.ReadOpen(f.FullPath())
+}
+
+func (f *file) writeOpen() (FsFile, error) {
+	return f.controller.CreateOrWriteOpen(f.FullPath())
+}
+
+func (f *file) version() int {
+	return f.v
 }

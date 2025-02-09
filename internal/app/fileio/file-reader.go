@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path"
 	"sync"
 )
 
@@ -14,43 +13,43 @@ type Reader interface {
 	Closed() bool
 }
 
-type FileReader struct {
-	file   *File
-	osFile *os.File
+type reader struct {
+	file   File
+	osFile FsFile
 	buffer *bufio.Reader
 	mx     sync.Mutex
 	v      int
 	closed bool
 }
 
-func NewFileReader(f *File, bufferSize, v int) (*FileReader, error) {
-	osFile, err := os.Open(path.Join(f.Path, f.ID.String()))
+func newFileReader(f File, bufferSize, version int) (Reader, error) {
+	osFile, err := f.readOpen()
 	if err != nil {
 		return nil, err
 	}
 
 	buffer := bufio.NewReaderSize(osFile, bufferSize)
 
-	return &FileReader{
+	return &reader{
 		file:   f,
 		osFile: osFile,
 		buffer: buffer,
 		mx:     sync.Mutex{},
-		v:      v, // version of the file
+		v:      version,
 	}, nil
 }
 
-func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
-	if r.file.closed || r.closed {
+func (r *reader) Seek(offset int64, whence int) (_ int64, err error) {
+	if r.file.Closed() || r.closed {
 		return 0, os.ErrClosed
 	}
-	if r.file.v != r.v {
+	if r.file.version() != r.v {
 		r.Close()
 		return 0, os.ErrClosed
 	}
 
-	r.file.mx.RLock()
-	defer r.file.mx.RUnlock()
+	r.file.rwMx().RLock()
+	defer r.file.rwMx().RUnlock()
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
@@ -75,11 +74,11 @@ func (r *FileReader) Seek(offset int64, whence int) (_ int64, err error) {
 	return newOffset, nil
 }
 
-func (r *FileReader) Closed() bool {
-	return r.closed || r.file.closed
+func (r *reader) Closed() bool {
+	return r.closed || r.file.Closed()
 }
 
-func (r *FileReader) Close() error {
+func (r *reader) Close() error {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 	r.closed = true
@@ -88,17 +87,17 @@ func (r *FileReader) Close() error {
 	return r.osFile.Close()
 }
 
-func (r *FileReader) Read(p []byte) (n int, err error) {
-	if r.file.closed || r.closed {
+func (r *reader) Read(p []byte) (n int, err error) {
+	if r.file.Closed() || r.closed {
 		return 0, os.ErrClosed
 	}
-	if r.file.v != r.v {
+	if r.file.version() != r.v {
 		r.Close()
 		return 0, os.ErrClosed
 	}
 
-	r.file.mx.RLock()
-	defer r.file.mx.RUnlock()
+	r.file.rwMx().RLock()
+	defer r.file.rwMx().RUnlock()
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
@@ -108,7 +107,7 @@ func (r *FileReader) Read(p []byte) (n int, err error) {
 }
 
 // mutexes must be triggered before using this func
-func (r *FileReader) position() (int64, error) {
+func (r *reader) position() (int64, error) {
 	ret, err := r.osFile.Seek(0, 1)
 
 	buffSize := r.buffer.Buffered()

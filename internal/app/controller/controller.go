@@ -12,15 +12,17 @@ import (
 var ErrMaxSizeExceeded = errors.New("max size exceeded")
 
 type Controller struct {
+	FileSystem
 	MaxSize     int
 	CurrentSize atomic.Int64
-	Files       map[uuid.UUID]*fileio.File
+	Files       map[uuid.UUID]fileio.File
 	path        string
 	mx          *sync.RWMutex
 }
 
 func NewController(filePath string, maxSize int) (*Controller, error) {
 	controller := &Controller{
+		FileSystem:  osFs{},
 		MaxSize:     maxSize,
 		CurrentSize: atomic.Int64{},
 		Files:       nil,
@@ -66,7 +68,7 @@ func (c *Controller) AllocateAll() (n int, err error) {
 	return 0, ErrMaxSizeExceeded
 }
 
-func (c *Controller) AddFile(id uuid.UUID) (*fileio.File, error) {
+func (c *Controller) AddFile(id uuid.UUID) (fileio.File, error) {
 	file, err := fileio.NewFile(c.path, id, c)
 	if err != nil {
 		return nil, err
@@ -102,7 +104,7 @@ func (c *Controller) DeleteFile(id uuid.UUID) error {
 	return nil
 }
 
-func (c *Controller) File(id uuid.UUID) (*fileio.File, error) {
+func (c *Controller) File(id uuid.UUID) (fileio.File, error) {
 	c.mx.RLock()
 	defer c.mx.RUnlock()
 
@@ -113,13 +115,13 @@ func (c *Controller) File(id uuid.UUID) (*fileio.File, error) {
 	return nil, os.ErrNotExist
 }
 
-func parseStorage(filePath string, controller *Controller) (files map[uuid.UUID]*fileio.File, currentSize int, err error) {
+func parseStorage(filePath string, controller *Controller) (files map[uuid.UUID]fileio.File, currentSize int, err error) {
 	dir, err := os.ReadDir(filePath)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	files = map[uuid.UUID]*fileio.File{}
+	files = map[uuid.UUID]fileio.File{}
 	for _, file := range dir {
 		if file.IsDir() {
 			continue

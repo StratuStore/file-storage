@@ -1,47 +1,40 @@
 package fileio
 
 import (
+	"io"
 	"os"
-	"path"
 	"sync"
 )
 
-// io.WriteCloser
-type FileWriter struct {
-	file   *File
-	osFile *os.File
-	mx     sync.Mutex
-	closed bool
+type writer struct {
+	ownFile File
+	osFile  FsFile
+	mx      sync.Mutex
+	closed  bool
 }
 
-func NewFileWriter(f *File) (*FileWriter, error) {
-	file, err := createOrOpenFile(path.Join(f.Path, f.ID.String()))
+func newFileWriter(f *file) (io.WriteCloser, error) {
+	file, err := f.writeOpen()
 	if err != nil {
 		return nil, err
 	}
 
-	err = f.controller.ReleaseStorage(f.Size)
-	if err != nil {
-		return nil, err
-	}
-	f.Size = 0
-
-	return &FileWriter{
-		file:   f,
-		osFile: file,
-		mx:     sync.Mutex{},
+	return &writer{
+		ownFile: f,
+		osFile:  file,
+		mx:      sync.Mutex{},
 	}, nil
 }
 
-func (f *FileWriter) Write(b []byte) (n int, err error) {
-	if f.file.closed || f.closed {
+func (f *writer) Write(b []byte) (n int, err error) {
+	if f.ownFile.Closed() || f.closed {
 		return 0, os.ErrClosed
 	}
 
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	err = f.file.controller.AllocateStorage(len(b))
+	err = f.ownFile.allocate(len(b))
 	if err != nil {
 		return 0, err
 	}
@@ -49,14 +42,14 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 	return f.osFile.Write(b)
 }
 
-func (f *FileWriter) Close() error {
+func (f *writer) Close() error {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
 	err := f.osFile.Close()
 	f.closed = true
 
-	f.file.mx.Unlock()
+	f.ownFile.rwMx().Unlock()
 
 	return err
 }

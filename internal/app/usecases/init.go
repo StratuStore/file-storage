@@ -7,7 +7,7 @@ import (
 )
 
 type UseCases struct {
-	FilesConnector    Connector[*fileio.File]
+	FilesConnector    Connector[fileio.File]
 	ReadersConnector  Connector[Reader]
 	StorageController StorageController
 	MaxBufferSize     int
@@ -37,7 +37,7 @@ type Reader interface {
 }
 
 type StorageController interface {
-	AddFile(id uuid.UUID) (*fileio.File, error)
+	AddFile(id uuid.UUID) (fileio.File, error)
 	DeleteFile(id uuid.UUID) error
-	File(id uuid.UUID) (*fileio.File, error)
+	File(id uuid.UUID) (fileio.File, error)
 }
