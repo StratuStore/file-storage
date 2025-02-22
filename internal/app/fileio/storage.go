@@ -22,6 +22,7 @@ type FsFile interface {
 	Stat() (os.FileInfo, error)
 }
 
+//go:generate go run github.com/vektra/mockery/v2@v2.52.3 --name=StorageController --filename=mock_storage.go
 type StorageController interface {
 	FileSystem
 	AllocateStorage(size int) error

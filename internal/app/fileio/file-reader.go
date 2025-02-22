@@ -22,7 +22,7 @@ type reader struct {
 	closed bool
 }
 
-func newFileReader(f File, bufferSize, version int) (Reader, error) {
+func newFileReader(f File, bufferSize int) (Reader, error) {
 	osFile, err := f.readOpen()
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func newFileReader(f File, bufferSize, version int) (Reader, error) {
 		osFile: osFile,
 		buffer: buffer,
 		mx:     sync.Mutex{},
-		v:      version,
+		v:      f.version(),
 	}, nil
 }
 
@@ -63,7 +63,7 @@ func (r *reader) Seek(offset int64, whence int) (_ int64, err error) {
 		return newOffset, err
 	}
 
-	if diff := newOffset - int64(r.buffer.Buffered()) - oldPosition; diff >= 0 {
+	if diff := newOffset - oldPosition; diff >= 0 && diff < int64(r.buffer.Buffered()) {
 		_, err = r.buffer.Discard(int(diff))
 		off, err2 := r.osFile.Seek(int64(r.buffer.Buffered()), 1)
 

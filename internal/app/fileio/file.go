@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+//go:generate go run github.com/vektra/mockery/v2@v2.52.3 --name=File --structname=MockFile --filename=mock_file.go --inpackage
 type File interface {
 	Sync(controller StorageController) error
 	Reader(bufferSize int) (Reader, error)
@@ -87,7 +88,7 @@ func (f *file) Reader(bufferSize int) (Reader, error) {
 	f.mx.RLock()
 	defer f.mx.RUnlock()
 
-	reader, err := newFileReader(f, bufferSize, f.v)
+	reader, err := newFileReader(f, bufferSize)
 	if err != nil {
 		return nil, err
 	}

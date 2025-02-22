@@ -24,3 +24,4 @@ go.work.sum
 # env fileio
 .env
 .idea/
+mock_*
