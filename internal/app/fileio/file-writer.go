@@ -14,7 +14,7 @@ type writer struct {
 }
 
 func newFileWriter(f *file) (io.WriteCloser, error) {
-	file, err := f.writeOpen()
+	file, err := f.openForWriting()
 	if err != nil {
 		return nil, err
 	}

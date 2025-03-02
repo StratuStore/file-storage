@@ -24,8 +24,8 @@ type File interface {
 	rwMx() *sync.RWMutex
 
 	allocate(size int) error
-	readOpen() (FsFile, error)
-	writeOpen() (FsFile, error)
+	openForReading() (FsFile, error)
+	openForWriting() (FsFile, error)
 }
 
 type file struct {
@@ -39,7 +39,7 @@ type file struct {
 }
 
 func NewFile(filePath string, id uuid.UUID, controller StorageController) (File, error) {
-	f, err := controller.CreateOrWriteOpen(path.Join(filePath, id.String()))
+	f, err := controller.CreateOrOpenForWriting(path.Join(filePath, id.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (f *file) Sync(controller StorageController) error {
 	if f.closed {
 		return os.ErrClosed
 	}
-	file, err := controller.CreateOrWriteOpen(f.FullPath())
+	file, err := controller.CreateOrOpenForWriting(f.FullPath())
 	if err != nil {
 		return err
 	}
@@ -166,12 +166,12 @@ func (f *file) rwMx() *sync.RWMutex {
 	return f.mx
 }
 
-func (f *file) readOpen() (FsFile, error) {
-	return f.controller.ReadOpen(f.FullPath())
+func (f *file) openForReading() (FsFile, error) {
+	return f.controller.OpenForReading(f.FullPath())
 }
 
-func (f *file) writeOpen() (FsFile, error) {
-	return f.controller.CreateOrWriteOpen(f.FullPath())
+func (f *file) openForWriting() (FsFile, error) {
+	return f.controller.CreateOrOpenForWriting(f.FullPath())
 }
 
 func (f *file) version() int {

@@ -7,10 +7,10 @@ import (
 )
 
 type FileSystem interface {
-	ReadOpen(name string) (FsFile, error)
+	OpenForReading(name string) (FsFile, error)
 	Stat(name string) (os.FileInfo, error)
 	FSDelete(name string) error
-	CreateOrWriteOpen(name string) (FsFile, error)
+	CreateOrOpenForWriting(name string) (FsFile, error)
 }
 
 type FsFile interface {

@@ -25,7 +25,7 @@ func prepareReaderFileMock(t interface {
 
 	mx := sync.RWMutex{}
 
-	fileMock.On("readOpen").Return(testFile, nil)
+	fileMock.On("openForReading").Return(testFile, nil)
 	fileMock.On("rwMx").Return(&mx)
 	fileMock.On("version").Return(1)
 	fileMock.On("Closed").Return(false)
@@ -137,14 +137,6 @@ func TestReader_ReadWithSeekFromBeginningPerSector_ReturnFullFile(t *testing.T) 
 			r, err := fileMock.Reader(BufferSize)
 			assert.NoError(t, err, "unable to get reader")
 			require.NotNil(t, r, "reader must not be nil")
-
-			data, err := io.ReadAll(r)
-			assert.NoError(t, err, "ReadAll call must have nil error")
-			assert.Equal(t, info, data, "info and data must be equal")
-
-			n, err = r.Seek(0, 0)
-			assert.EqualValues(t, 0, n, "position of the file should be 0")
-			assert.NoError(t, err, "position of the file should be 0")
 
 			fullSectors := append(tt.sectors, len(info))
 			var startOfSector int

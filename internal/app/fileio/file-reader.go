@@ -23,7 +23,7 @@ type reader struct {
 }
 
 func newFileReader(f File, bufferSize int) (Reader, error) {
-	osFile, err := f.readOpen()
+	osFile, err := f.openForReading()
 	if err != nil {
 		return nil, err
 	}
