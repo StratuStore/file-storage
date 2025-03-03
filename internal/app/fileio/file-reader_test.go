@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -85,6 +86,7 @@ func TestReader_ReadSequentiallyPerSector_ReturnFullFile(t *testing.T) {
 					assert.Equal(t, info[prevSector:sector], b[prevSector:sector], "sector of read data = sector of initial data")
 					assert.Nil(t, err, "error must be nil")
 					prevSector = sector
+					runtime.GC()
 				})
 			}
 
@@ -101,13 +103,13 @@ func TestReader_ReadWithSeekFromBeginningPerSector_ReturnFullFile(t *testing.T) 
 	}{
 		{
 			[]byte("hello and welcome"),
-			[]int{4, 9, 13},
-			[]int{2, 1, 0, 3},
+			[]int{4, 7, 10, 13},
+			[]int{2, 1, 4, 0, 3},
 		},
 		{
 			[]byte("hello and welcome"),
-			[]int{4, 9, 13},
-			[]int{1, 2, 3, 0},
+			[]int{4, 9, 10, 13},
+			[]int{1, 2, 3, 4, 0},
 		},
 		{
 			[]byte("hq"),
@@ -160,7 +162,9 @@ func TestReader_ReadWithSeekFromBeginningPerSector_ReturnFullFile(t *testing.T) 
 					assert.EqualValues(t, sector.end-sector.start, n64, "size of read data must be equal to diff between borders", sector.end, "-", sector.start)
 					assert.Equal(t, info[sector.start:sector.end], b[sector.start:sector.end], "sector of read data = sector of initial data")
 					assert.NoError(t, err, "error must be nil")
-
+					if sector.start%2 == 0 {
+						runtime.GC()
+					}
 				})
 			}
 

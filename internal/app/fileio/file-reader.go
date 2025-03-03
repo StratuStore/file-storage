@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"weak"
 )
 
 type Reader interface {
@@ -14,12 +15,14 @@ type Reader interface {
 }
 
 type reader struct {
-	file   File
-	osFile FsFile
-	buffer *bufio.Reader
-	mx     sync.Mutex
-	v      int
-	closed bool
+	file       File
+	osFile     FsFile
+	buffer     weak.Pointer[bufio.Reader]
+	bufferSize int
+	mx         sync.Mutex
+	v          int
+	closed     bool
+	pos        int64
 }
 
 func newFileReader(f File, bufferSize int) (Reader, error) {
@@ -28,18 +31,19 @@ func newFileReader(f File, bufferSize int) (Reader, error) {
 		return nil, err
 	}
 
-	buffer := bufio.NewReaderSize(osFile, bufferSize)
+	buffer := weak.Make(bufio.NewReaderSize(osFile, bufferSize))
 
 	return &reader{
-		file:   f,
-		osFile: osFile,
-		buffer: buffer,
-		mx:     sync.Mutex{},
-		v:      f.version(),
+		file:       f,
+		osFile:     osFile,
+		buffer:     buffer,
+		bufferSize: bufferSize,
+		mx:         sync.Mutex{},
+		v:          f.version(),
 	}, nil
 }
 
-func (r *reader) Seek(offset int64, whence int) (_ int64, err error) {
+func (r *reader) Seek(offset int64, whence int) (n int64, err error) {
 	if r.file.Closed() || r.closed {
 		return 0, os.ErrClosed
 	}
@@ -53,25 +57,31 @@ func (r *reader) Seek(offset int64, whence int) (_ int64, err error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	oldPosition, err := r.position()
-	if err != nil {
-		return oldPosition, err
+	buffer := r.buffer.Value()
+	if buffer == nil {
+		n, err = r.osFile.Seek(offset, whence)
+		r.pos = n
+
+		return n, err
 	}
 
 	newOffset, err := r.osFile.Seek(offset, whence)
 	if err != nil {
+		r.pos = newOffset
 		return newOffset, err
 	}
 
-	if diff := newOffset - oldPosition; diff >= 0 && diff < int64(r.buffer.Buffered()) {
-		_, err = r.buffer.Discard(int(diff))
-		off, err2 := r.osFile.Seek(int64(r.buffer.Buffered()), 1)
+	if diff := newOffset - r.pos; diff >= 0 && diff < int64(buffer.Buffered()) {
+		_, err = buffer.Discard(int(diff))
+		off, err2 := r.osFile.Seek(int64(buffer.Buffered()), io.SeekCurrent)
+		r.pos = off - int64(buffer.Buffered())
 
-		return off - int64(r.buffer.Buffered()), errors.Join(err, err2)
+		return r.pos, errors.Join(err, err2)
 	}
-	r.buffer.Reset(r.osFile)
+	buffer.Reset(r.osFile)
+	r.pos = newOffset
 
-	return newOffset, nil
+	return r.pos, nil
 }
 
 func (r *reader) Closed() bool {
@@ -82,7 +92,6 @@ func (r *reader) Close() error {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 	r.closed = true
-	r.buffer = nil
 
 	return r.osFile.Close()
 }
@@ -101,16 +110,15 @@ func (r *reader) Read(p []byte) (n int, err error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	n, err = r.buffer.Read(p)
+	buffer := r.buffer.Value()
+	if buffer == nil {
+		_, err = r.osFile.Seek(r.pos, io.SeekStart)
+		buffer = bufio.NewReaderSize(r.osFile, r.bufferSize)
+		r.buffer = weak.Make(buffer)
+	}
+
+	n, err = buffer.Read(p)
+	r.pos += int64(n)
 
 	return n, err
-}
-
-// mutexes must be triggered before using this func
-func (r *reader) position() (int64, error) {
-	ret, err := r.osFile.Seek(0, 1)
-
-	buffSize := r.buffer.Buffered()
-
-	return ret - int64(buffSize), err
 }
