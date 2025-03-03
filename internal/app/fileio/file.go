@@ -39,6 +39,7 @@ type file struct {
 }
 
 func NewFile(filePath string, id uuid.UUID, controller StorageController) (File, error) {
+	// open file to get size
 	f, err := controller.CreateOrOpenForWriting(path.Join(filePath, id.String()))
 	if err != nil {
 		return nil, err
@@ -64,6 +65,8 @@ func (f *file) Sync(controller StorageController) error {
 	if f.closed {
 		return os.ErrClosed
 	}
+
+	// open file to get size
 	file, err := controller.CreateOrOpenForWriting(f.FullPath())
 	if err != nil {
 		return err
@@ -100,6 +103,7 @@ func (f *file) Writer() (io.WriteCloser, error) {
 	if f.closed {
 		return nil, os.ErrClosed
 	}
+
 	f.mx.Lock()
 
 	f.v++
