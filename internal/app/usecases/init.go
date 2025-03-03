@@ -4,6 +4,7 @@ import (
 	"github.com/StratuStore/file-storage/internal/app/fileio"
 	"github.com/google/uuid"
 	"io"
+	"log/slog"
 )
 
 type UseCases struct {
@@ -12,6 +13,25 @@ type UseCases struct {
 	StorageController StorageController
 	MaxBufferSize     int
 	MinBufferSize     int
+	l                 *slog.Logger
+}
+
+func NewUseCases(
+	filesConnector Connector[fileio.File],
+	readersConnector Connector[Reader],
+	storageController StorageController,
+	maxBufferSize int,
+	minBufferSize int,
+	logger *slog.Logger,
+) *UseCases {
+	return &UseCases{
+		FilesConnector:    filesConnector,
+		ReadersConnector:  readersConnector,
+		StorageController: storageController,
+		MaxBufferSize:     maxBufferSize,
+		MinBufferSize:     minBufferSize,
+		l:                 logger.With(slog.String("op", "internal.app.usecases.UseCases")),
+	}
 }
 
 type Connector[V Closer] interface {

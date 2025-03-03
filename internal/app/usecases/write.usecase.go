@@ -19,10 +19,24 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 	}
 	defer writer.Close()
 
-	_, err = io.Copy(writer, reader)
+	_, err = io.Copy(writer, &contextReader{reader, ctx})
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+type contextReader struct {
+	io.Reader
+	ctx context.Context
+}
+
+func (c *contextReader) Read(p []byte) (n int, err error) {
+	select {
+	case <-c.ctx.Done():
+		return 0, c.ctx.Err()
+	default:
+		return c.Reader.Read(p)
+	}
 }
