@@ -7,12 +7,12 @@ import (
 
 // Close supposed to be a request from user directly
 func (u *UseCases) Close(ctx context.Context, connectionID uuid.UUID) (err error) {
-	file, err := u.FilesConnector.Connection(connectionID)
+	reader, err := u.ReadersConnector.Connection(connectionID)
 	if err != nil {
 		return err
 	}
 
-	err = file.Close()
+	err = reader.Close()
 	if err != nil {
 		return err
 	}

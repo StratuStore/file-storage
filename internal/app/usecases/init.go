@@ -34,14 +34,13 @@ func NewUseCases(
 	}
 }
 
-type Connector[V Closer] interface {
+type Connector[V Closeder] interface {
 	OpenConnection(value V) (uuid.UUID, error)
 	Connection(id uuid.UUID) (V, error)
 }
 
-type Closer interface {
+type Closeder interface {
 	Closed() bool
-	io.Closer
 }
 
 type File interface {
@@ -53,7 +52,7 @@ type File interface {
 
 type Reader interface {
 	io.ReadSeekCloser
-	Closer
+	Closeder
 }
 
 type StorageController interface {

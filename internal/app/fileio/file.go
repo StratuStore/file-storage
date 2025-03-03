@@ -13,7 +13,6 @@ type File interface {
 	Sync(controller StorageController) error
 	Reader(bufferSize int) (Reader, error)
 	Writer() (io.WriteCloser, error)
-	Close() error
 	Delete() error
 
 	ID() uuid.UUID
@@ -125,24 +124,13 @@ func (f *file) Writer() (io.WriteCloser, error) {
 	return writer, err
 }
 
-func (f *file) Close() error {
-	if f.closed {
-		return os.ErrClosed
-	}
-	f.mx.Lock()
-	f.closed = true
-	f.mx.Unlock()
-
-	return nil
-}
-
 func (f *file) Delete() error {
 	if f.closed {
 		return os.ErrClosed
 	}
-	f.Close()
 	f.mx.Lock()
 	defer f.mx.Unlock()
+	f.closed = true
 
 	return f.controller.FSDelete(f.FullPath())
 }

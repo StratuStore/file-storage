@@ -9,17 +9,16 @@ import (
 	"time"
 )
 
-type Closer interface {
+type Closeder interface {
 	Closed() bool
-	io.Closer
 }
 
-// Connector saves an opened disposable objects.
-type Connector[V Closer] struct {
+// Connector saves opened disposable objects.
+type Connector[V Closeder] struct {
 	m syncmap.Map[uuid.UUID, Connection[V]]
 }
 
-func NewConnector[V Closer]() *Connector[V] {
+func NewConnector[V Closeder]() *Connector[V] {
 	return &Connector[V]{m: syncmap.NewMap[uuid.UUID, Connection[V]]()}
 }
 
@@ -65,7 +64,9 @@ func (c *Connector[V]) StartDisposalRoutine(sleep time.Duration, timeout time.Du
 func (c *Connector[V]) dispose(timeout time.Duration) (err error) {
 	for id, connection := range c.m.All() {
 		if connection.ActivityTime.Add(timeout).Before(time.Now()) || connection.Value.Closed() {
-			connection.Value.Close()
+			if closer, ok := any(connection.Value).(io.Closer); ok && !connection.Value.Closed() {
+				closer.Close()
+			}
 
 			err = errors.Join(err, c.m.Delete(id))
 		}
