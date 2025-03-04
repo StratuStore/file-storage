@@ -1,6 +1,7 @@
 package fileio
 
 import (
+	"errors"
 	"github.com/google/uuid"
 	"io"
 	"os"
@@ -26,6 +27,8 @@ type File interface {
 	openForReading() (FsFile, error)
 	openForWriting() (FsFile, error)
 }
+
+var ErrBusy = errors.New("file is busy")
 
 type file struct {
 	id         uuid.UUID
@@ -87,7 +90,10 @@ func (f *file) Reader(bufferSize int) (Reader, error) {
 	if f.closed {
 		return nil, os.ErrClosed
 	}
-	f.mx.RLock()
+
+	if !f.mx.TryRLock() {
+		return nil, ErrBusy
+	}
 	defer f.mx.RUnlock()
 
 	reader, err := newFileReader(f, bufferSize)

@@ -60,3 +60,24 @@ type StorageController interface {
 	DeleteFile(id uuid.UUID) error
 	File(id uuid.UUID) (fileio.File, error)
 }
+
+type ErrorWithMessage interface {
+	error
+	Message() string
+}
+
+type errorWithMessage struct {
+	message string
+}
+
+func newErrorWithMessage(message string) ErrorWithMessage {
+	return &errorWithMessage{message: message}
+}
+
+func (e *errorWithMessage) Error() string {
+	return e.message
+}
+
+func (e *errorWithMessage) Message() string {
+	return e.message
+}

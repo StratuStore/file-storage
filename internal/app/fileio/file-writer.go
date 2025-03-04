@@ -26,30 +26,30 @@ func newFileWriter(f *file) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (f *writer) Write(b []byte) (n int, err error) {
-	if f.ownFile.Closed() || f.closed {
+func (w *writer) Write(b []byte) (n int, err error) {
+	if w.ownFile.Closed() || w.closed {
 		return 0, os.ErrClosed
 	}
 
-	f.mx.Lock()
-	defer f.mx.Unlock()
+	w.mx.Lock()
+	defer w.mx.Unlock()
 
-	err = f.ownFile.allocate(len(b))
+	err = w.ownFile.allocate(len(b))
 	if err != nil {
 		return 0, err
 	}
 
-	return f.osFile.Write(b)
+	return w.osFile.Write(b)
 }
 
-func (f *writer) Close() error {
-	f.mx.Lock()
-	defer f.mx.Unlock()
+func (w *writer) Close() error {
+	w.mx.Lock()
+	defer w.mx.Unlock()
 
-	err := f.osFile.Close()
-	f.closed = true
+	err := w.osFile.Close()
+	w.closed = true
 
-	f.ownFile.rwMx().Unlock()
+	w.ownFile.rwMx().Unlock()
 
 	return err
 }

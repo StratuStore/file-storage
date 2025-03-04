@@ -2,9 +2,11 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/StratuStore/file-storage/internal/app/usecases"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 type Handler struct {
@@ -19,7 +21,13 @@ func NewHandler(useCases usecases.UseCases, logger *slog.Logger) *Handler {
 	}
 }
 
-func (h *Handler) handleError(w http.ResponseWriter, status int, message string) error {
+func (h *Handler) handleError(w http.ResponseWriter, status int, err error, messages ...string) error {
+	var errWithMessage usecases.ErrorWithMessage
+	if errors.As(err, &errWithMessage) {
+		messages = append(messages, errWithMessage.Message())
+	}
+	message := strings.Join(messages, ", ")
+
 	w.WriteHeader(status)
 	response := ResponseError{Err: message}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
