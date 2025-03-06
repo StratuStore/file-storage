@@ -75,7 +75,7 @@ func (c *Controller) AddFile(id uuid.UUID) (fileio.File, error) {
 	}
 
 	c.mx.Lock()
-	defer c.mx.RUnlock()
+	defer c.mx.Unlock()
 	if _, ok := c.Files[id]; ok {
 		return nil, os.ErrExist
 	}

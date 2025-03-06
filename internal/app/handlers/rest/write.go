@@ -26,7 +26,7 @@ func (h *Handler) WriteFile(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = h.useCases.Write(req.Context(), connectionID, req.Body)
+	err = h.useCases.Write(req.Context(), connectionID, req.Body, req.ContentLength)
 	if err != nil {
 		_ = h.handleError(w, http.StatusNotFound, err, "connection error")
 		l.Debug("unable to find suitable file reader", slog.String("err", err.Error()))

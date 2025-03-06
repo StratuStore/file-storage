@@ -10,11 +10,11 @@ import (
 )
 
 type Handler struct {
-	useCases usecases.UseCases
+	useCases *usecases.UseCases
 	l        *slog.Logger
 }
 
-func NewHandler(useCases usecases.UseCases, logger *slog.Logger) *Handler {
+func NewHandler(useCases *usecases.UseCases, logger *slog.Logger) *Handler {
 	return &Handler{
 		useCases: useCases,
 		l:        logger.With(slog.String("op", "internal.app.handlers.rest.Handler")),

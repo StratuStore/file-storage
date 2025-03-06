@@ -7,7 +7,7 @@ import (
 )
 
 // Write supposed to be a request from user directly
-func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.Reader) (err error) {
+func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.Reader, size int64) (err error) {
 	file, err := u.FilesConnector.Connection(connectionID)
 	if err != nil {
 		return err
@@ -19,7 +19,7 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 	}
 	defer writer.Close()
 
-	_, err = io.Copy(writer, &contextReader{reader, ctx})
+	_, err = io.CopyN(writer, &contextReader{reader, ctx}, size)
 	if err != nil {
 		return err
 	}
