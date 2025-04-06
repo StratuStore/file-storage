@@ -12,7 +12,7 @@ func (u *UseCases) OpenFile(ctx context.Context, fileID uuid.UUID) (connectionID
 		return connectionID, err
 	}
 
-	bufferSize := max(min(u.MaxBufferSize, file.Size()/10), u.MinBufferSize)
+	bufferSize := max(min(u.MaxBufferSize, int(file.Size())), u.MinBufferSize)
 
 	reader, err := file.Reader(bufferSize)
 	if err != nil {

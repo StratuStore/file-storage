@@ -13,55 +13,56 @@ var ErrMaxSizeExceeded = errors.New("max size exceeded")
 
 type Controller struct {
 	FileSystem
-	MaxSize     int
+	MaxSize     int64
 	CurrentSize atomic.Int64
 	Files       map[uuid.UUID]fileio.File
 	path        string
 	mx          *sync.RWMutex
 }
 
-func NewController(filePath string, maxSize int) (*Controller, error) {
+func NewController(path string, maxSize int64) (*Controller, error) {
 	controller := &Controller{
 		FileSystem:  osFs{},
 		MaxSize:     maxSize,
 		CurrentSize: atomic.Int64{},
 		Files:       nil,
-		path:        filePath,
+		path:        path,
 		mx:          &sync.RWMutex{},
 	}
 
-	files, currentSize, err := parseStorage(filePath, controller)
+	files, err := controller.FileSystem.ListDir(path)
 	if err != nil {
 		return nil, err
 	}
-	if currentSize > maxSize {
+	err = controller.parseStorage(path, files)
+	if err != nil {
+		return nil, err
+	}
+	if controller.CurrentSize.Load() > maxSize {
 		return nil, ErrMaxSizeExceeded
 	}
-
-	controller.Files = files
-	controller.CurrentSize.Add(int64(currentSize))
 
 	return controller, nil
 }
 
-func (c *Controller) AllocateStorage(size int) error {
-	if int(c.CurrentSize.Load())+size > c.MaxSize {
+func (c *Controller) AllocateStorage(size int64) error {
+	if c.CurrentSize.Load()+size > c.MaxSize {
 		return ErrMaxSizeExceeded
 	}
 
-	c.CurrentSize.Add(int64(size))
+	c.CurrentSize.Add(size)
 
 	return nil
 }
 
-func (c *Controller) ReleaseStorage(size int) error {
-	c.CurrentSize.Add(-int64(size))
+func (c *Controller) ReleaseStorage(size int64) error {
+	c.CurrentSize.Add(-size)
 
 	return nil
 }
 
 func (c *Controller) AllocateAll() (n int, err error) {
-	if result := int64(c.MaxSize) - c.CurrentSize.Load(); result > 0 {
+	if result := c.MaxSize - c.CurrentSize.Load(); result > 0 {
 		return int(result), err
 	}
 
@@ -115,39 +116,25 @@ func (c *Controller) File(id uuid.UUID) (fileio.File, error) {
 	return nil, os.ErrNotExist
 }
 
-func parseStorage(filePath string, controller *Controller) (files map[uuid.UUID]fileio.File, currentSize int, err error) {
-	dir, err := os.ReadDir(filePath)
-	if err != nil {
-		return nil, 0, err
+func (c *Controller) parseStorage(path string, files map[string]int64) (globalErr error) {
+	c.Files = make(map[uuid.UUID]fileio.File, len(files))
+
+	for filename, size := range files {
+		id, err := uuid.Parse(filename)
+		if err != nil {
+			errors.Join(globalErr, err)
+			continue
+		}
+
+		file, err := fileio.NewFile(path, id, c)
+		if err != nil {
+			errors.Join(globalErr, err)
+			continue
+		}
+
+		c.Files[id] = file
+		c.CurrentSize.Add(size)
 	}
 
-	files = map[uuid.UUID]fileio.File{}
-	for _, file := range dir {
-		if file.IsDir() {
-			continue
-		}
-
-		stat, err2 := file.Info()
-		if err2 != nil {
-			errors.Join(err, err2)
-			continue
-		}
-		currentSize += int(stat.Size())
-
-		id, err2 := uuid.Parse(stat.Name())
-		if err2 != nil {
-			errors.Join(err, err2)
-			continue
-		}
-
-		file, err2 := fileio.NewFile(filePath, id, controller)
-		if err2 != nil {
-			errors.Join(err, err2)
-			continue
-		}
-
-		files[id] = file
-	}
-
-	return files, currentSize, err
+	return globalErr
 }

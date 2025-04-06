@@ -18,12 +18,12 @@ type File interface {
 
 	ID() uuid.UUID
 	FullPath() string
-	Size() int
+	Size() int64
 	Closed() bool
 	version() int
 	rwMx() *sync.RWMutex
 
-	allocate(size int) error
+	allocate(size int64) error
 	openForReading() (FsFile, error)
 	openForWriting() (FsFile, error)
 }
@@ -33,7 +33,7 @@ var ErrBusy = errors.New("file is busy")
 type file struct {
 	id         uuid.UUID
 	path       string
-	size       int
+	size       int64
 	controller StorageController
 	mx         *sync.RWMutex
 	closed     bool
@@ -56,7 +56,7 @@ func NewFile(filePath string, id uuid.UUID, controller StorageController) (File,
 	return &file{
 		id:         id,
 		path:       filePath,
-		size:       int(size),
+		size:       size,
 		controller: controller,
 		mx:         &sync.RWMutex{},
 	}, nil
@@ -77,7 +77,7 @@ func (f *file) Sync(controller StorageController) error {
 	if err != nil {
 		return err
 	}
-	f.size = int(stat.Size())
+	f.size = stat.Size()
 	file.Close()
 
 	f.controller = controller
@@ -152,11 +152,11 @@ func (f *file) FullPath() string {
 func (f *file) ID() uuid.UUID {
 	return f.id
 }
-func (f *file) Size() int {
+func (f *file) Size() int64 {
 	return f.size
 }
 
-func (f *file) allocate(size int) error {
+func (f *file) allocate(size int64) error {
 	return f.controller.AllocateStorage(size)
 }
 

@@ -20,16 +20,16 @@ func NewUseCases(
 	filesConnector Connector[fileio.File],
 	readersConnector Connector[Reader],
 	storageController StorageController,
-	maxBufferSize int,
-	minBufferSize int,
 	logger *slog.Logger,
+	minBufferSize int,
+	maxBufferSize int,
 ) *UseCases {
 	return &UseCases{
 		FilesConnector:    filesConnector,
 		ReadersConnector:  readersConnector,
 		StorageController: storageController,
-		MaxBufferSize:     maxBufferSize,
 		MinBufferSize:     minBufferSize,
+		MaxBufferSize:     maxBufferSize,
 		l:                 logger.With(slog.String("op", "internal.app.usecases.UseCases")),
 	}
 }

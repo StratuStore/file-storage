@@ -34,7 +34,7 @@ func (w *writer) Write(b []byte) (n int, err error) {
 	w.mx.Lock()
 	defer w.mx.Unlock()
 
-	err = w.ownFile.allocate(len(b))
+	err = w.ownFile.allocate(int64(len(b)))
 	if err != nil {
 		return 0, err
 	}
