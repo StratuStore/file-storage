@@ -1,0 +1,35 @@
+# https://taskfile.dev
+
+version: '3'
+
+dotenv:
+  - .env
+
+tasks:
+  default:
+    desc: "runs the app and any dependencies defined within the docker-compose.yml"
+    aliases: [up, run]
+    preconditions:
+      - test -f compose.yaml
+    cmds:
+      - docker compose up --build -d
+
+  down:
+    desc: "stops and removes docker compose container"
+    cmds:
+      - docker compose down
+
+  build:
+    desc: "build the compiled binary"
+    cmds:
+      - go build -o app cmd/app/main.go
+
+  test:
+    desc: "run all unit tests"
+    cmds:
+      - go test -v ./...
+
+  lint:
+    desc: "lint the code"
+    cmds:
+      - golangci-lint run -v ./...

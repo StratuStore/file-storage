@@ -1,0 +1,31 @@
+services:
+  file-storage:
+    build:
+      context: .
+      target: final
+    env_file:
+      - ./.env
+    ports:
+      - "$HTTP_PORT:$HTTP_PORT"
+    depends_on:
+      rabbit:
+        condition: service_healthy
+    volumes:
+      - "$REAL_STORAGE_PATH:$STORAGE_PATH"
+
+  rabbit:
+    image: rabbitmq:management-alpine
+    hostname: rabbit
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: "$RABBIT_USER"
+      RABBITMQ_DEFAULT_PASS: "$RABBIT_PASS"
+      RABBITMQ_DEFAULT_VHOST: "$RABBIT_VHOST"
+    ports:
+      - 15672:15672
+      - 5672:5672
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 3s
+      timeout: 10s
+      retries: 10
