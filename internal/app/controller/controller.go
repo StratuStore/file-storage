@@ -45,6 +45,14 @@ func NewController(path string, maxSize int64) (*Controller, error) {
 	return controller, nil
 }
 
+func (c *Controller) TryAllocateStorage(size int64) error {
+	if c.CurrentSize.Load()+size > c.MaxSize {
+		return ErrMaxSizeExceeded
+	}
+
+	return nil
+}
+
 func (c *Controller) AllocateStorage(size int64) error {
 	if c.CurrentSize.Load()+size > c.MaxSize {
 		return ErrMaxSizeExceeded

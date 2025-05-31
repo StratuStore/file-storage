@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"github.com/StratuStore/file-storage/internal/app/connector"
 	"github.com/StratuStore/file-storage/internal/app/controller"
 	"github.com/StratuStore/file-storage/internal/app/fileio"
+	"github.com/StratuStore/file-storage/internal/app/handlers/queue"
 	"github.com/StratuStore/file-storage/internal/app/handlers/rest"
 	"github.com/StratuStore/file-storage/internal/app/usecases"
 	"github.com/StratuStore/file-storage/internal/libs/config"
@@ -14,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func Run() {
@@ -34,6 +37,10 @@ func Run() {
 
 	useCases := usecases.NewUseCases(filesConnector, readersConnector, filesController, l, cfg.MinBufferSize, cfg.MaxBufferSize)
 	handler := rest.NewHandler(useCases, l, cfg)
+	queueHandler, err := queue.New(l, cfg, useCases, filesController)
+	if err != nil {
+		panic(err)
+	}
 
 	// Graceful shutdown context
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -46,8 +53,22 @@ func Run() {
 	})
 
 	g.Go(func() error {
+		filesConnector.StartDisposalRoutine(time.Duration(cfg.GC.SleepInMinutes)*time.Minute, time.Duration(cfg.GC.KeepAliveInMinutes)*time.Minute)
+		readersConnector.StartDisposalRoutine(time.Duration(cfg.GC.SleepInMinutes)*time.Minute, time.Duration(cfg.GC.KeepAliveInMinutes)*time.Minute)
+
+		return nil
+	})
+
+	g.Go(func() error {
+		return queueHandler.Start(ctx)
+	})
+
+	g.Go(func() error {
 		<-gCtx.Done()
-		return handler.Stop(ctx)
+
+		err := queueHandler.Stop(ctx)
+		err = errors.Join(err, handler.Stop(ctx))
+		return err
 	})
 
 	if err := g.Wait(); err != nil {

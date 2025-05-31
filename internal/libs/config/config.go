@@ -7,9 +7,22 @@ import (
 	"os"
 )
 
+type GC struct {
+	SleepInMinutes     uint `env:"DISPOSAL_SLEEP_IN_MINUTES" env-default:"20"`
+	KeepAliveInMinutes uint `env:"DISPOSAL_KEEP_ALIVE_IN_MINUTES" env-default:"10"`
+}
+
+type RabbitMQ struct {
+	Host      string `env:"FOR_RABBIT_HOST"`
+	URN       string `env:"RABBIT_URN"`
+	Topic     string `env:"RABBIT_TOPIC"`
+	QueueName string `env:"RABBIT_QUEUE_NAME"`
+	Token     string `env:"EXCHANGE_TOKEN"`
+}
+
 type Handler struct {
 	URL        string `env:"URL"`
-	CORSOrigin string `env:"CORS_ORIGIN"`
+	CORSOrigin string `env:"HTTP_CORS_ORIGINS"`
 }
 
 type Storage struct {
@@ -26,6 +39,8 @@ type Logger struct {
 
 type Config struct {
 	Logger
+	GC
+	RabbitMQ
 	Handler
 	Storage
 	Env string `env:"ENV" env-default:"dev"`
