@@ -32,6 +32,7 @@ func (osFs) CreateOrOpenForWriting(name string) (fileio.FsFile, error) {
 }
 
 func (osFs) ListDir(path string) (files map[string]int64, err error) {
+	files = make(map[string]int64)
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
