@@ -13,6 +13,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"log/slog"
 	"net/http"
+	"sync"
 )
 
 type Handler struct {
@@ -55,11 +56,19 @@ func (h *Handler) Start(ctx context.Context) error {
 		return err
 	}
 
+	var wg sync.WaitGroup
+
 	for msg := range ch {
-		if err2 := h.handle(msg); err2 != nil {
-			err = errors.Join(err, err2)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err2 := h.handle(msg); err2 != nil {
+				err = errors.Join(err, err2)
+			}
+		}()
 	}
+
+	wg.Wait()
 
 	return err
 }
