@@ -65,6 +65,7 @@ func (h *Handler) Register() {
 }
 
 func (h *Handler) Start(ctx context.Context) error {
+	h.Register()
 	// Init server
 	h.server = &http.Server{
 		Addr:    h.cfg.URL,
