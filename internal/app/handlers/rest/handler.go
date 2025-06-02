@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type Handler struct {
@@ -39,7 +38,7 @@ func (h *Handler) Register() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.URLFormat)
-	r.Use(middleware.Timeout(60 * time.Second))
+	//r.Use(middleware.Timeout(60 * time.Second))
 
 	if h.cfg.Env == "dev" {
 		r.Use(cors.Handler(cors.Options{
