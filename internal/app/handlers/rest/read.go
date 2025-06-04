@@ -12,6 +12,7 @@ func (h *Handler) ReadFile(w http.ResponseWriter, req *http.Request) {
 	l := h.l.With(slog.String("op", "internal.app.handlers.rest.ReadFile"))
 
 	rawConnectionID := req.URL.Query().Get("connectionID")
+	filename := req.URL.Query().Get("name")
 
 	connectionID, err := uuid.Parse(rawConnectionID)
 	if err != nil {
@@ -27,5 +28,5 @@ func (h *Handler) ReadFile(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	http.ServeContent(w, req, "", time.Time{}, reader)
+	http.ServeContent(w, req, filename, time.Time{}, reader)
 }
