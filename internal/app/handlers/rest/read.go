@@ -12,7 +12,6 @@ func (h *Handler) ReadFile(w http.ResponseWriter, req *http.Request) {
 	l := h.l.With(slog.String("op", "internal.app.handlers.rest.ReadFile"))
 
 	rawConnectionID := req.URL.Query().Get("connectionID")
-	filename := req.URL.Query().Get("name")
 
 	connectionID, err := uuid.Parse(rawConnectionID)
 	if err != nil {
@@ -26,6 +25,11 @@ func (h *Handler) ReadFile(w http.ResponseWriter, req *http.Request) {
 		_ = h.handleError(w, http.StatusNotFound, err, "connection error")
 		l.Debug("unable to find suitable file reader", slog.String("err", err.Error()))
 		return
+	}
+
+	filename := req.URL.Query().Get("name")
+	if filename != "" {
+		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 	}
 
 	http.ServeContent(w, req, filename, time.Time{}, reader)
