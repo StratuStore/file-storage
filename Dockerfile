@@ -5,6 +5,7 @@ WORKDIR /src
 ARG TARGETARCH
 ARG SERVICE_NAME="app"
 
+COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
     CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/service ./cmd/${SERVICE_NAME}
