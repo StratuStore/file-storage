@@ -26,4 +26,4 @@ USER appuser
 
 COPY --from=build /bin/service /bin/
 
-ENTRYPOINT ["sh", "-c", "sleep 5 && /bin/service"]
+ENTRYPOINT ["sh", "-c", "sleep 10 && /bin/service"]
