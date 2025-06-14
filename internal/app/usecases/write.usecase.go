@@ -24,9 +24,9 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 	}
 	defer writer.Close()
 
-	_, err = io.CopyN(writer, &contextReader{reader, ctx}, size)
-	if err != nil {
-		return errors.Join(err, u.handleWriteError(ctx, file.Host, file.File.ID()))
+	n, err := io.CopyN(writer, &contextReader{reader, ctx}, size)
+	if err != nil || n != size {
+		return fmt.Errorf("unable to write full file: %w", errors.Join(err, u.handleWriteError(ctx, file.Host, file.File.ID())))
 	}
 
 	return nil
