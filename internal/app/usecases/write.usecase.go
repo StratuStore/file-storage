@@ -24,6 +24,10 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 	}
 	defer writer.Close()
 
+	if size <= 0 {
+		return fmt.Errorf("request is empty: %w", u.handleWriteError(context.Background(), file.Host, file.File.ID()))
+	}
+
 	n, err := io.CopyN(writer, &contextReader{reader, ctx}, size)
 	if err != nil || n != size {
 		return fmt.Errorf("unable to write full file: %w", errors.Join(err, u.handleWriteError(context.Background(), file.Host, file.File.ID())))
