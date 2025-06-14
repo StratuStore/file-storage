@@ -67,8 +67,9 @@ func (h *Handler) Start(ctx context.Context) error {
 	h.Register()
 	// Init server
 	h.server = &http.Server{
-		Addr:    h.cfg.URL,
-		Handler: h.r,
+		Addr:        h.cfg.URL,
+		Handler:     h.r,
+		IdleTimeout: h.cfg.IdleTimeout,
 	}
 
 	return h.server.ListenAndServe()

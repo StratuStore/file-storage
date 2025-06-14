@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ilyakaznacheev/cleanenv"
 	"os"
+	"time"
 )
 
 type GC struct {
@@ -21,8 +22,9 @@ type RabbitMQ struct {
 }
 
 type Handler struct {
-	URL        string `env:"URL"`
-	CORSOrigin string `env:"HTTP_CORS_ORIGINS"`
+	URL         string        `env:"URL"`
+	CORSOrigin  string        `env:"HTTP_CORS_ORIGINS"`
+	IdleTimeout time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"5s"`
 }
 
 type Storage struct {
