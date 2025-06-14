@@ -13,8 +13,11 @@ import (
 	"github.com/go-resty/resty/v2"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 )
+
+const fsmPath = "/communicate"
 
 type Handler struct {
 	l        *slog.Logger
@@ -102,12 +105,19 @@ func (h *Handler) handle(msg *message.Message) error {
 		return err
 	}
 
+	link, err := url.JoinPath(request.Host, fsmPath)
+	if err != nil {
+		l.Error("unable to join url path", slog.String("err", err.Error()))
+
+		return err
+	}
+
 	result, err := h.client.R().
 		SetContext(ctx).
 		SetAuthScheme("Bearer").
 		SetAuthToken(h.token).
 		SetBody(responseBody).
-		Post(request.Host)
+		Post(link)
 	if err != nil {
 		l.Error("unable to make request to fsm", slog.String("err", err.Error()))
 		revert()
@@ -131,7 +141,7 @@ func (h *Handler) processRequest(ctx context.Context, r *Request) (response *Res
 			return nil, nil, err
 		}
 
-		connectionID, err := h.useCases.CreateFile(ctx, r.FileID)
+		connectionID, err := h.useCases.CreateFile(ctx, r.Host, r.FileID)
 		if err != nil {
 			l.Error("unable to create file", slog.String("err", err.Error()))
 
@@ -159,7 +169,7 @@ func (h *Handler) processRequest(ctx context.Context, r *Request) (response *Res
 			return nil, nil, err
 		}
 
-		connectionID, err := h.useCases.UpdateFile(ctx, r.FileID)
+		connectionID, err := h.useCases.UpdateFile(ctx, r.Host, r.FileID)
 		var errString string
 		if err != nil {
 			l.Error("unable to update file", slog.String("err", err.Error()))

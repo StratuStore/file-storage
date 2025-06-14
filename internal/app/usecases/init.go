@@ -2,27 +2,31 @@ package usecases
 
 import (
 	"github.com/StratuStore/file-storage/internal/app/fileio"
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"io"
 	"log/slog"
 )
 
 type UseCases struct {
-	FilesConnector    Connector[fileio.File]
+	FilesConnector    Connector[*FileWithHost]
 	ReadersConnector  Connector[Reader]
 	StorageController StorageController
 	MaxBufferSize     int
 	MinBufferSize     int
 	l                 *slog.Logger
+	serviceToken      string
+	client            *resty.Client
 }
 
 func NewUseCases(
-	filesConnector Connector[fileio.File],
+	filesConnector Connector[*FileWithHost],
 	readersConnector Connector[Reader],
 	storageController StorageController,
 	logger *slog.Logger,
 	minBufferSize int,
 	maxBufferSize int,
+	serviceToken string,
 ) *UseCases {
 	return &UseCases{
 		FilesConnector:    filesConnector,
@@ -30,6 +34,8 @@ func NewUseCases(
 		StorageController: storageController,
 		MinBufferSize:     minBufferSize,
 		MaxBufferSize:     maxBufferSize,
+		serviceToken:      serviceToken,
+		client:            resty.New(),
 		l:                 logger.With(slog.String("op", "internal.app.usecases.UseCases")),
 	}
 }
@@ -43,16 +49,22 @@ type Closeder interface {
 	Closed() bool
 }
 
-type File interface {
-	io.Writer
-	io.WriterAt
-	io.Closer
-	Delete() error
-}
-
 type Reader interface {
 	io.ReadSeekCloser
 	Closeder
+}
+
+type FileWithHost struct {
+	File fileio.File
+	Host string
+}
+
+func (f *FileWithHost) Writer() (io.WriteCloser, error) {
+	return f.File.Writer()
+}
+
+func (f *FileWithHost) Closed() bool {
+	return f.File.Closed()
 }
 
 type StorageController interface {

@@ -2,9 +2,14 @@ package usecases
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"io"
+	"net/url"
 )
+
+const fsmPath = "/file/"
 
 // Write supposed to be a request from user directly
 func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.Reader, size int64) (err error) {
@@ -21,7 +26,29 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 
 	_, err = io.CopyN(writer, &contextReader{reader, ctx}, size)
 	if err != nil {
-		return err
+		return errors.Join(err, u.handleWriteError(ctx, file.Host, file.File.ID()))
+	}
+
+	return nil
+}
+
+func (u *UseCases) handleWriteError(ctx context.Context, host string, fileID uuid.UUID) error {
+	link, err := url.JoinPath(host, fsmPath, fileID.String())
+	if err != nil {
+		return fmt.Errorf("failed to join path during handling /write error: %w", err)
+	}
+
+	_, err = u.client.R().
+		SetContext(ctx).
+		SetAuthScheme("Bearer").
+		SetAuthToken(u.serviceToken).
+		Delete(link)
+	if err != nil {
+		return fmt.Errorf("failed to delete file during handling /write error: %w", err)
+	}
+
+	if err := u.DeleteFile(ctx, fileID); err != nil {
+		return fmt.Errorf("failed to delete file after write error: %w", err)
 	}
 
 	return nil

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/StratuStore/file-storage/internal/app/connector"
 	"github.com/StratuStore/file-storage/internal/app/controller"
-	"github.com/StratuStore/file-storage/internal/app/fileio"
 	"github.com/StratuStore/file-storage/internal/app/handlers/queue"
 	"github.com/StratuStore/file-storage/internal/app/handlers/rest"
 	"github.com/StratuStore/file-storage/internal/app/usecases"
@@ -27,7 +26,7 @@ func Run() {
 
 	l, _ := log.New(cfg)
 
-	filesConnector := connector.NewConnector[fileio.File]()
+	filesConnector := connector.NewConnector[*usecases.FileWithHost]()
 	readersConnector := connector.NewConnector[usecases.Reader]()
 
 	filesController, err := controller.NewController(cfg.StoragePath, cfg.StorageSize)
@@ -35,7 +34,7 @@ func Run() {
 		panic(err)
 	}
 
-	useCases := usecases.NewUseCases(filesConnector, readersConnector, filesController, l, cfg.MinBufferSize, cfg.MaxBufferSize)
+	useCases := usecases.NewUseCases(filesConnector, readersConnector, filesController, l, cfg.MinBufferSize, cfg.MaxBufferSize, cfg.Token)
 	handler := rest.NewHandler(useCases, l, cfg)
 	queueHandler, err := queue.New(l, cfg, useCases, filesController)
 	if err != nil {
