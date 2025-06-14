@@ -26,7 +26,7 @@ func (u *UseCases) Write(ctx context.Context, connectionID uuid.UUID, reader io.
 
 	n, err := io.CopyN(writer, &contextReader{reader, ctx}, size)
 	if err != nil || n != size {
-		return fmt.Errorf("unable to write full file: %w", errors.Join(err, u.handleWriteError(ctx, file.Host, file.File.ID())))
+		return fmt.Errorf("unable to write full file: %w", errors.Join(err, u.handleWriteError(context.Background(), file.Host, file.File.ID())))
 	}
 
 	return nil
