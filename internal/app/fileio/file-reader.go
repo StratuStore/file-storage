@@ -2,7 +2,6 @@ package fileio
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"os"
 	"sync"
@@ -57,29 +56,24 @@ func (r *reader) Seek(offset int64, whence int) (n int64, err error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 
-	buffer := r.buffer.Value()
-	if buffer == nil {
-		n, err = r.osFile.Seek(offset, whence)
-		r.pos = n
-
-		return n, err
+	oldOffset, err := r.osFile.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
 	}
-
+	_, err = r.osFile.Seek(r.pos, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
 	newOffset, err := r.osFile.Seek(offset, whence)
 	if err != nil {
-		r.pos = newOffset
-		return newOffset, err
+		return 0, err
 	}
-
-	if diff := newOffset - r.pos; diff >= 0 && diff < int64(buffer.Buffered()) {
-		_, err = buffer.Discard(int(diff))
-		off, err2 := r.osFile.Seek(int64(buffer.Buffered()), io.SeekCurrent)
-		r.pos = off - int64(buffer.Buffered())
-
-		return r.pos, errors.Join(err, err2)
-	}
-	buffer.Reset(r.osFile)
 	r.pos = newOffset
+
+	_, err = r.osFile.Seek(oldOffset, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
 
 	return r.pos, nil
 }
@@ -115,6 +109,24 @@ func (r *reader) Read(p []byte) (n int, err error) {
 		_, err = r.osFile.Seek(r.pos, io.SeekStart)
 		buffer = bufio.NewReaderSize(r.osFile, r.bufferSize)
 		r.buffer = weak.Make(buffer)
+	}
+
+	offset, err := r.osFile.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	if diff := offset - r.pos; diff >= 0 && diff < int64(buffer.Buffered()) {
+		_, err = buffer.Discard(int(r.pos - (offset - int64(buffer.Buffered()))))
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		_, err = r.osFile.Seek(r.pos, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+		buffer.Reset(r.osFile)
 	}
 
 	n, err = buffer.Read(p)
